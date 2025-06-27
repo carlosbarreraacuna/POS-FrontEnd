@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import axios from "axios"
+import { useEffect, useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,46 +10,81 @@ import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Package, AlertTriangle, TrendingDown, TrendingUp, Plus, Search } from "lucide-react"
-
-const inventarioData = [
-  {
-    id: 1,
-    nombre: "Pollo",
-    categoria: "Carnes",
-    stock: 2,
-    stockMinimo: 5,
-    unidad: "kg",
-    precio: 12000,
-    proveedor: "Avícola San Juan",
-    estado: "critico",
-  },
-  {
-    id: 2,
-    nombre: "Arroz",
-    categoria: "Granos",
-    stock: 25,
-    stockMinimo: 10,
-    unidad: "kg",
-    precio: 3500,
-    proveedor: "Distribuidora Central",
-    estado: "normal",
-  },
-  {
-    id: 3,
-    nombre: "Frijoles",
-    categoria: "Granos",
-    stock: 8,
-    stockMinimo: 15,
-    unidad: "kg",
-    precio: 8000,
-    proveedor: "Distribuidora Central",
-    estado: "bajo",
-  },
-]
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 export default function GestionInventario() {
   const [selectedTab, setSelectedTab] = useState("stock")
   const [searchTerm, setSearchTerm] = useState("")
+  const [productos, setProductos] = useState<any[]>([])
+  const [openModal, setOpenModal] = useState(false)
+  const [nuevoProducto, setNuevoProducto] = useState({
+    nombre: "",
+    descripcion: "",
+    precio: "",
+    imagen: "",
+    disponible: "",
+    sku: "",
+    categoria_id: "",
+  })
+  const formRef = useRef<HTMLFormElement>(null)
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    axios
+      .get(`${process.env.NEXT_PUBLIC_API_URL}/productos`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      .then((res) => setProductos(res.data))
+      .catch((err) => console.error(err))
+  }, [])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setNuevoProducto({ ...nuevoProducto, [e.target.name]: e.target.value })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const token = localStorage.getItem("token")
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/productos`,
+        nuevoProducto,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+      setOpenModal(false)
+      setNuevoProducto({ nombre: "", descripcion: "", precio: "", imagen: "", disponible: "", sku: "", categoria_id: "" })
+      if (formRef.current) formRef.current.reset()
+      // Refrescar productos
+      axios
+        .get(`${process.env.NEXT_PUBLIC_API_URL}/productos`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        .then((res) => setProductos(res.data))
+    } catch (err) {
+      alert("Error al crear producto")
+    }
+  }
+
+  // Adaptar los datos de la API a la estructura de la UI
+  const inventarioData = productos.map((prod) => ({
+    id: prod.id,
+    nombre: prod.nombre,
+    descripcion: prod.descripcion,
+    precio: prod.precio,
+    imagen: prod.imagen,
+    stock: prod.disponible,
+    stockMinimo: 10, // Ajusta según tu lógica o agrega este campo en tu API
+    unidad: "und",   // Ajusta según tu lógica o agrega este campo en tu API
+    proveedor: "N/A", // Ajusta según tu lógica o agrega este campo en tu API
+    estado: prod.disponible < 5 ? "critico" : prod.disponible < 15 ? "bajo" : "normal",
+    sku: prod.sku, 
+    categoria: prod.categoria_id,
+  }))
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -89,7 +124,7 @@ export default function GestionInventario() {
             <TrendingDown className="mr-2 h-4 w-4" />
             Entrada Stock
           </Button>
-          <Button className="bg-orange-600 hover:bg-orange-700">
+          <Button className="bg-orange-600 hover:bg-orange-700" onClick={() => setOpenModal(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Nuevo Producto
           </Button>
@@ -269,10 +304,107 @@ export default function GestionInventario() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={openModal} onOpenChange={setOpenModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Nuevo Producto</DialogTitle>
+          </DialogHeader>
+
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label className="block text-sm font-medium text-muted-foreground" htmlFor="nombre">Nombre</Label>
+              <Input
+                id="nombre"
+                name="nombre"
+                placeholder="Nombre del producto"
+                required
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="block text-sm font-medium text-muted-foreground" htmlFor="descripcion">Descripción</Label>
+              <Textarea
+                id="descripcion"
+                name="descripcion"
+                placeholder="Descripción detallada"
+                rows={3}
+                required
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="block text-sm font-medium text-muted-foreground" htmlFor="precio">Precio</Label>
+                <Input
+                  id="precio"
+                  name="precio"
+                  type="number"
+                  placeholder="$0.00"
+                  required
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="block text-sm font-medium text-muted-foreground" htmlFor="disponible">Stock Disponible</Label>
+                <Input
+                  id="disponible"
+                  name="disponible"
+                  type="number"
+                  placeholder="Cantidad"
+                  required
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="block text-sm font-medium text-muted-foreground" htmlFor="imagen">URL de Imagen</Label>
+              <Input
+                id="imagen"
+                name="imagen"
+                placeholder="https://..."
+                onChange={handleInputChange}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="block text-sm font-medium text-muted-foreground" htmlFor="sku">SKU</Label>
+                <Input
+                  id="sku"
+                  name="sku"
+                  placeholder="SKU123"
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="block text-sm font-medium text-muted-foreground" htmlFor="categoria_id">Categoría ID</Label>
+                <Input
+                  id="categoria_id"
+                  name="categoria_id"
+                  placeholder="Ej: 5"
+                  required
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-4">
+              <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white">
+                Crear Producto
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
 
-function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <label className={className}>{children}</label>
+function Label({ children, className, htmlFor }: { children: React.ReactNode; className?: string; htmlFor?: string }) {
+  return <label className={className} htmlFor={htmlFor}>{children}</label>
 }
