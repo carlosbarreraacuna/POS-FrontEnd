@@ -8,8 +8,8 @@ import { Separator } from "@/components/ui/separator"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Trash2,
   Plus,
@@ -48,6 +48,7 @@ interface Product {
 
 interface CartItem extends Product {
   quantity: number
+  nota?: string // Nota específica del producto
 }
 
 // Hook personalizado para detectar tablets
@@ -88,6 +89,9 @@ export default function VentaDirecta() {
   const [discount, setDiscount] = useState(0)
   const [tip, setTip] = useState(10)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [selectedTable, setSelectedTable] = useState<string>("")
+  const [orderNote, setOrderNote] = useState<string>("")
+  const [showNotesModal, setShowNotesModal] = useState(false)
 
   const isMobile = useIsMobile()
   const deviceType = useDeviceType()
@@ -193,13 +197,26 @@ export default function VentaDirecta() {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId))
   }
 
+  const updateProductNote = (productId: number, note: string) => {
+    setCart((prevCart) => prevCart.map((item) => (item.id === productId ? { ...item, nota: note } : item)))
+  }
+
   const clearCart = () => {
     setCart([])
     setDiscount(0)
+    setSelectedTable("")
+    setOrderNote("")
   }
 
   const handleKOT = () => {
-    alert("KOT (Kitchen Order Ticket) enviado a cocina")
+    const orderData = {
+      items: cart,
+      mesa: selectedTable,
+      nota: orderNote,
+      cliente: customerName,
+    }
+    console.log("KOT Data:", orderData)
+    alert(`KOT enviado a cocina - Mesa: ${selectedTable || "Sin mesa"}`)
   }
 
   const handleKOTPrint = () => {
@@ -215,7 +232,15 @@ export default function VentaDirecta() {
   }
 
   const handleInvoiceAndPrintReceipt = () => {
-    alert(`Factura procesada e impresa - Total: $${cartTotals.total.toFixed(2)}`)
+    const orderData = {
+      items: cart,
+      mesa: selectedTable,
+      nota: orderNote,
+      cliente: customerName,
+      total: cartTotals.total,
+    }
+    console.log("Order Data:", orderData)
+    alert(`Factura procesada - Mesa: ${selectedTable || "Sin mesa"} - Total: $${cartTotals.total.toFixed(2)}`)
     clearCart()
   }
 
@@ -270,6 +295,122 @@ export default function VentaDirecta() {
           </Select>
         </div>
 
+        {/* Configuración de mesa */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs md:text-sm font-medium">Mesa:</span>
+          <Select value={selectedTable || "Sin mesa"} onValueChange={setSelectedTable}>
+            <SelectTrigger className="w-full text-xs md:text-sm">
+              <SelectValue placeholder="Seleccionar mesa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Sin mesa">Sin mesa</SelectItem>
+              <SelectItem value="Mesa 1">Mesa 1</SelectItem>
+              <SelectItem value="Mesa 2">Mesa 2</SelectItem>
+              <SelectItem value="Mesa 3">Mesa 3</SelectItem>
+              <SelectItem value="Mesa 4">Mesa 4</SelectItem>
+              <SelectItem value="Mesa 5">Mesa 5</SelectItem>
+              <SelectItem value="Mesa 6">Mesa 6</SelectItem>
+              <SelectItem value="Mesa 7">Mesa 7</SelectItem>
+              <SelectItem value="Mesa 8">Mesa 8</SelectItem>
+              <SelectItem value="Mesa 9">Mesa 9</SelectItem>
+              <SelectItem value="Mesa 10">Mesa 10</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Botón de Notas del Pedido */}
+        <div className="mb-3">
+          <Dialog open={showNotesModal} onOpenChange={setShowNotesModal}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="w-full justify-between text-xs md:text-sm bg-transparent">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  <span>Notas del Pedido</span>
+                  {(orderNote || cart.some((item) => item.nota)) && (
+                    <Badge variant="secondary" className="text-xs">
+                      {[orderNote, ...cart.filter((item) => item.nota)].filter(Boolean).length}
+                    </Badge>
+                  )}
+                </div>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Notas del Pedido #{orderNumber}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {/* Nota general */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Nota general del pedido:</label>
+                  <Input
+                    placeholder="Agregar nota general..."
+                    value={orderNote}
+                    onChange={(e) => setOrderNote(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+
+                {/* Notas por producto */}
+                {cart.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium mb-3 block">Notas por producto:</label>
+                    <div className="space-y-3">
+                      {cart.map((item) => (
+                        <div key={item.id} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700 line-clamp-1">
+                              {item.nombre} (x{item.quantity})
+                            </span>
+                            {item.nota && (
+                              <Badge variant="secondary" className="text-xs">
+                                Con nota
+                              </Badge>
+                            )}
+                          </div>
+                          <Input
+                            placeholder={`Nota para ${item.nombre}...`}
+                            value={item.nota || ""}
+                            onChange={(e) => updateProductNote(item.id, e.target.value)}
+                            className="text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Resumen de notas */}
+                {(orderNote || cart.some((item) => item.nota)) && (
+                  <div className="pt-3 border-t border-gray-200">
+                    <span className="text-sm font-medium text-gray-600 block mb-2">Resumen de notas:</span>
+                    <div className="space-y-2">
+                      {orderNote && (
+                        <div className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
+                          <span className="font-medium">General:</span> {orderNote}
+                        </div>
+                      )}
+                      {cart
+                        .filter((item) => item.nota)
+                        .map((item) => (
+                          <div key={item.id} className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
+                            <span className="font-medium">{item.nombre}:</span> {item.nota}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button onClick={() => setShowNotesModal(false)} size="sm">
+                    Cerrar
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
         {/* Opciones de servicio */}
         <div className="flex gap-1 md:gap-2 text-xs">
           <Button variant="default" size="sm" className="bg-orange-500 hover:bg-orange-600 flex-1 lg:flex-none">
@@ -284,7 +425,7 @@ export default function VentaDirecta() {
         </div>
       </div>
 
-      {/* Tabla de items del carrito */}
+      {/* Lista de items del carrito */}
       <div className="flex-1 overflow-auto">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 p-4">
@@ -292,150 +433,75 @@ export default function VentaDirecta() {
             <p className="text-sm md:text-base">El carrito está vacío</p>
           </div>
         ) : (
-          <>
-            {/* Vista móvil y tablet portrait - Cards */}
-            {(deviceType === "mobile" || (deviceType === "tablet" && window.innerWidth < 900)) && (
-              <div className="p-2 md:p-3">
-                <div className="space-y-2 md:space-y-3">
-                  {cart.map((item) => (
-                    <Card key={item.id} className="p-3 md:p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 md:w-16 md:h-16 relative rounded overflow-hidden flex-shrink-0">
-                          <Image
-                            src={
-                              item.imagen ? `${process.env.NEXT_PUBLIC_API_URL}/storage/${item.imagen}` : "/chef1.jpg"
-                            }
-                            alt={item.nombre}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm md:text-base line-clamp-1">{item.nombre}</h4>
-                          <p className="text-gray-500 text-xs md:text-sm">{item.categoria?.nombre}</p>
-                          <p className="text-orange-600 font-semibold text-sm md:text-base">
-                            ${item.precio.toFixed(2)}
-                          </p>
-                          <div className="flex items-center justify-between mt-2 md:mt-3">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="w-7 h-7 md:w-8 md:h-8 p-0"
-                              >
-                                <Minus className="w-3 h-3 md:w-4 md:h-4" />
-                              </Button>
-                              <span className="w-8 text-center font-medium text-sm md:text-base">{item.quantity}</span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-7 h-7 md:w-8 md:h-8 p-0"
-                              >
-                                <Plus className="w-3 h-3 md:w-4 md:h-4" />
-                              </Button>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-sm md:text-base">
-                                ${(item.precio * item.quantity).toFixed(2)}
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => removeFromCart(item.id)}
-                                className="w-7 h-7 md:w-8 md:h-8 p-0 text-red-500 hover:text-red-700"
-                              >
-                                <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
-                              </Button>
-                            </div>
+          <div className="p-2">
+            <Table>
+              <TableHeader>
+                <TableRow className="text-xs text-gray-500 border-b">
+                  <TableHead className="text-left font-medium p-2">ARTÍCULO</TableHead>
+                  <TableHead className="text-center font-medium w-16 p-1">CANT.</TableHead>
+                  <TableHead className="text-center font-medium w-14 p-1">PRECIO</TableHead>
+                  <TableHead className="text-center font-medium w-14 p-1">TOTAL</TableHead>
+                  <TableHead className="text-center font-medium w-8 p-1"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cart.map((item) => (
+                  <TableRow key={item.id} className="border-b border-gray-100">
+                    <TableCell className="py-2 px-2">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-xs text-gray-900 line-clamp-2 leading-tight">
+                          {item.nombre}
+                        </span>
+                        {item.nota && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <FileText className="w-2 h-2 text-gray-400" />
+                            <span className="text-xs text-gray-500">Nota</span>
                           </div>
-                        </div>
+                        )}
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Vista tablet landscape y desktop - Tabla */}
-            {(deviceType === "desktop" || (deviceType === "tablet" && window.innerWidth >= 900)) && (
-              <div className="p-2">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="text-xs md:text-sm">
-                      <TableHead className="w-[40%]">NOMBRE DEL ARTÍCULO</TableHead>
-                      <TableHead className="w-[15%] text-center">CANT.</TableHead>
-                      <TableHead className="w-[20%] text-center">PRECIO</TableHead>
-                      <TableHead className="w-[20%] text-center">MONTO</TableHead>
-                      <TableHead className="w-[5%]">ACCIÓN</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {cart.map((item) => (
-                      <TableRow key={item.id} className="text-xs md:text-sm">
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 md:w-10 md:h-10 relative rounded overflow-hidden flex-shrink-0">
-                              <Image
-                                src={
-                                  item.imagen
-                                    ? `${process.env.NEXT_PUBLIC_API_URL}/storage/${item.imagen}`
-                                    : "/chef1.jpg"
-                                }
-                                alt={item.nombre}
-                                fill
-                                className="object-cover"
-                              />
-                            </div>
-                            <div>
-                              <p className="line-clamp-1 font-medium">{item.nombre}</p>
-                              <p className="text-gray-500 text-xs">{item.categoria?.nombre}</p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              className="w-6 h-6 md:w-7 md:h-7 p-0"
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                            <span className="w-8 text-center font-medium">{item.quantity}</span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              className="w-6 h-6 md:w-7 md:h-7 p-0"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center font-medium">${item.precio.toFixed(2)}</TableCell>
-                        <TableCell className="text-center font-bold">
-                          ${(item.precio * item.quantity).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => removeFromCart(item.id)}
-                            className="w-6 h-6 md:w-7 md:h-7 p-0 text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </>
+                    </TableCell>
+                    <TableCell className="py-2 px-1">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="w-5 h-5 p-0 rounded-full border-gray-300"
+                        >
+                          <Minus className="w-2 h-2" />
+                        </Button>
+                        <span className="w-6 text-center font-medium text-xs mx-0.5">{item.quantity}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="w-5 h-5 p-0 rounded-full border-gray-300"
+                        >
+                          <Plus className="w-2 h-2" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-2 px-1 text-center">
+                      <span className="text-xs font-medium">${item.precio.toFixed(2)}</span>
+                    </TableCell>
+                    <TableCell className="py-2 px-1 text-center">
+                      <span className="text-xs font-bold">${(item.precio * item.quantity).toFixed(2)}</span>
+                    </TableCell>
+                    <TableCell className="py-2 px-1 text-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeFromCart(item.id)}
+                        className="w-6 h-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </div>
 
@@ -482,6 +548,16 @@ export default function VentaDirecta() {
             <span className="text-orange-600">${cartTotals.total.toFixed(2)}</span>
           </div>
         </div>
+
+        {/* Resumen de configuración */}
+        {selectedTable && (
+          <div className="p-2 bg-gray-50 rounded-md text-xs">
+            <div className="flex justify-between">
+              <span className="font-medium">Mesa:</span>
+              <span>{selectedTable}</span>
+            </div>
+          </div>
+        )}
 
         {/* Botones de acción */}
         <div className="space-y-2">
@@ -635,7 +711,7 @@ export default function VentaDirecta() {
                             </DialogTrigger>
                             <DialogContent className="max-w-sm md:max-w-md">
                               <DialogHeader>
-                                <DialogTitle className="text-base md:text-lg">Detalles del producto</DialogTitle>
+                                <DialogTitle className="text-base md:text-lg">{product.nombre}</DialogTitle>
                               </DialogHeader>
                               <div className="space-y-4">
                                 <div className="aspect-video relative rounded-lg overflow-hidden">
