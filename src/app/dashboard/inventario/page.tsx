@@ -32,7 +32,7 @@ export default function GestionInventario() {
   useEffect(() => {
     const token = localStorage.getItem("token")
     axios
-      .get(`${process.env.NEXT_PUBLIC_API_URL}/productos`, {
+      .get(`${process.env.NEXT_PUBLIC_API_URL}/v1/productos`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -50,7 +50,7 @@ export default function GestionInventario() {
     const token = localStorage.getItem("token")
     try {
       await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/productos`,
+        `${process.env.NEXT_PUBLIC_API_URL}/v1/productos`,
         nuevoProducto,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -61,7 +61,7 @@ export default function GestionInventario() {
       if (formRef.current) formRef.current.reset()
       // Refrescar productos
       axios
-        .get(`${process.env.NEXT_PUBLIC_API_URL}/productos`, {
+        .get(`${process.env.NEXT_PUBLIC_API_URL}/v1/productos`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         .then((res) => setProductos(res.data))

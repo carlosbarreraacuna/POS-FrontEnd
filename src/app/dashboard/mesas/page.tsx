@@ -201,7 +201,7 @@ export default function GestionMesas() {
     try {
       setLoading(true)
       const token = localStorage.getItem("token")
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/mesas`, {
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/v1/mesas`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

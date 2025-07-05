@@ -65,7 +65,7 @@ export default function UsuariosPage() {
       try {
         setLoading(true)
         const token = localStorage.getItem("token")
-        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/usuarios`, {
+        const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/v1/usuarios`, {
           headers: { Authorization: `Bearer ${token}` },
         })
 
